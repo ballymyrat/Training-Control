@@ -19,6 +19,29 @@ jobs:
           gradle-version: '8.9'
       - name: Build installable demo APK
         run: gradle :app:assembleDebug --no-daemon
+      - name: Inspect APK security properties
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -s "$APK"
+          "$AAPT" dump badging "$APK" | tee apk-inspection.txt
+          "$AAPT" dump permissions "$APK" | tee apk-permissions.txt
+          grep -q "targetSdkVersion:'35'" apk-inspection.txt
+          if grep -q "uses-permission:" apk-permissions.txt; then
+            echo "Unexpected Android permissions detected"
+            exit 1
+          fi
+          sha256sum "$APK" | tee apk-sha256.txt
+          echo "APK checked: target SDK 35; no requested Android permissions"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Training-Control-Security-Report
+          path: |
+            apk-inspection.txt
+            apk-permissions.txt
+            apk-sha256.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Training-Control-Android-APK
